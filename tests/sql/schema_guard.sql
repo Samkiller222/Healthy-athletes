@@ -12,7 +12,7 @@ begin
   select string_agg(format('%s.%s', table_name, column_name), ', ')
     into bad
   from information_schema.columns
-  where table_schema = 'public'
+  where table_schema = 'healthy_athletes'
     and column_name ~* deny;
 
   if bad is not null then
@@ -31,7 +31,7 @@ begin
   from information_schema.columns c
   join information_schema.tables t
     on t.table_schema = c.table_schema and t.table_name = c.table_name
-  where c.table_schema = 'public'
+  where c.table_schema = 'healthy_athletes'
     and t.table_type = 'BASE TABLE'
     and c.data_type in ('text', 'character varying', 'character', 'json', 'jsonb', 'bytea')
     and format('%s.%s', c.table_name, c.column_name) not in (
@@ -66,7 +66,7 @@ begin
       join information_schema.check_constraints cc
         on cc.constraint_name = ccu.constraint_name
        and cc.constraint_schema = ccu.constraint_schema
-      where ccu.table_schema = 'public'
+      where ccu.table_schema = 'healthy_athletes'
         and format('%s.%s', ccu.table_name, ccu.column_name) = col
     ) then
       missing := missing || col || ' ';
@@ -78,14 +78,14 @@ begin
   end if;
 end $$;
 
--- Every public table must have RLS on.
+-- Every healthy_athletes table must have RLS on.
 do $$
 declare
   bad text;
 begin
   select string_agg(relname, ', ') into bad
   from pg_class
-  where relnamespace = 'public'::regnamespace
+  where relnamespace = 'healthy_athletes'::regnamespace
     and relkind = 'r'
     and not relrowsecurity;
 

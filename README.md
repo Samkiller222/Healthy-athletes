@@ -4,7 +4,7 @@ Event-day logistics for Special Olympics Malta Healthy Athletes: reception check
 
 ## Database
 
-`supabase/migrations/` holds the Postgres schema, check constraints and row-level security for the four roles (organiser, receptionist, station lead, display). The Display account can read only the `display_feed` view (station, athlete code, first name, called time).
+`supabase/migrations/` holds the Postgres schema (all in its own `healthy_athletes` schema, so it can share a Supabase project with other apps), check constraints and row-level security for the four roles (organiser, receptionist, station lead, display). The Display account can read only the `display_feed` view (station, athlete code, first name, called time).
 
 ## Tests
 
