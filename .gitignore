@@ -1,0 +1,7 @@
+# Never commit secrets or real athlete data (this repo is public).
+.env
+.env.*
+*.csv
+*.xlsx
+supabase/.temp/
+node_modules/
