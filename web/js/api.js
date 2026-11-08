@@ -186,3 +186,12 @@ export async function deleteAthlete(id) {
 export async function deleteAllAthletes() {
   check(await need().from("athletes").delete().not("id", "is", null));
 }
+
+// --- TV display -----------------------------------------------------------
+// One call returns everything the hall display shows (see display_board() in
+// db/migrations/20261108020000_display_board.sql). Athletes appear by first
+// name + code only. With no eventId the database picks the live event.
+
+export async function displayBoard(eventId = null) {
+  return check(await need().rpc("display_board", eventId ? { p_event_id: eventId } : {}));
+}

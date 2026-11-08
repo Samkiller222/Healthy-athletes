@@ -18,3 +18,4 @@ done
 run tests/sql/schema_guard.sql && echo "schema guard passed"
 run tests/sql/rls_test.sql && echo "rls tests passed"
 run tests/sql/organiser_test.sql && echo "organiser tests passed"
+run tests/sql/display_test.sql && echo "display tests passed"

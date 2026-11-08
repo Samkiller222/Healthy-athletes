@@ -4,7 +4,7 @@ Event-day logistics for Special Olympics Malta Healthy Athletes: reception check
 
 ## Database
 
-`db/migrations/` holds the Postgres schema (all in its own `healthy_athletes` schema), runs on Neon (Frankfurt), and holds the, check constraints and row-level security for the four roles (organiser, receptionist, station lead, display). The Display account can read only the `display_feed` view (station, athlete code, first name, called time).
+`db/migrations/` holds the Postgres schema (all in its own `healthy_athletes` schema), runs on Neon (Frankfurt), and holds the, check constraints and row-level security for the four roles (organiser, receptionist, station lead, display). The Display account has no table access: it reads only the `display_feed` view and the `display_board()` function, which give first name + athlete code, never surname or club.
 
 ## Tests
 
@@ -33,6 +33,19 @@ A static site with no build step: plain HTML and ES modules. Every screen goes t
 - `organiser/athletes.html`: CSV import, athlete list, manual deletion. The CSV may only have `first_name`, `last_name`, `club`, `age_band`, `code`; any other column rejects the whole file, in the browser and again in the database (`import_athletes`). The file is read in the browser and never uploaded.
 
 Run locally: `python3 -m http.server -d web 8000` (Neon Auth allows localhost). `web/config.js` holds the public Neon Auth and Data API URLs, never a connection string.
+
+## Hall TV display (web/display/)
+
+`display/index.html` is the full-screen call-up board for the hall TV. The Display account lands on it after signing in.
+
+- Left, **Calling now**: everyone currently called, newest first and largest, with the station's icon and colour.
+- Right, one row per active station: icon, name and TV subtitle, who is **next**, how many are **in queue**, and an estimated **wait** (queue length x the station's average minutes per athlete over its last 10 finished visits, or the organiser's "minutes per athlete" until there are any).
+- Athletes appear by **first name + athlete code only**, never surname or club.
+- Data comes from one database function, `display_board()`, polled every 3 seconds. It shows the event marked **Live** (or `?event=<id>`). A yellow "Reconnecting" banner appears if the connection drops; the clock follows the server's time (Malta time).
+- A soft chime plays on each new call once someone clicks **Turn on call chime** (browsers block sound until a click). In kiosk mode start Chrome with `--kiosk --autoplay-policy=no-user-gesture-required` and no click is needed.
+- `display/index.html?demo` shows made-up data with no sign-in, to check the layout on the TV.
+
+Stations are set up per event on the event page: name, TV subtitle, icon (fixed list), colour, order and minutes per athlete.
 
 ### Backend: Neon
 

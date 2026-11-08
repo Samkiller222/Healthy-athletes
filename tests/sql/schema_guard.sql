@@ -36,7 +36,7 @@ begin
     and c.data_type in ('text', 'character varying', 'character', 'json', 'jsonb', 'bytea')
     and format('%s.%s', c.table_name, c.column_name) not in (
       'events.name', 'events.venue', 'events.status',
-      'stations.name', 'stations.colour',
+      'stations.name', 'stations.colour', 'stations.icon', 'stations.subtitle',
       'clubs.name',
       'athletes.code', 'athletes.first_name', 'athletes.last_name', 'athletes.age_band',
       'staff.name', 'staff.role',
@@ -56,7 +56,7 @@ declare
   missing text := '';
 begin
   foreach col in array array[
-    'events.status', 'stations.colour', 'athletes.code', 'athletes.age_band',
+    'events.status', 'stations.colour', 'stations.icon', 'stations.subtitle', 'athletes.code', 'athletes.age_band',
     'staff.role', 'station_visits.status', 'station_visits.skip_reason',
     'audit_log.action'
   ] loop

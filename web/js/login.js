@@ -36,7 +36,8 @@ async function route() {
     return;
   }
   if (staff.role === "organiser") return location.assign("organiser/events.html");
-  // Reception, station and display screens arrive in later build steps.
+  if (staff.role === "display") return location.assign("display/index.html");
+  // Reception and station screens arrive in later build steps.
   show(h("h2", {}, `Signed in as ${staff.name}`),
     h("p", {}, `Role: ${ROLE_LABEL[staff.role] ?? staff.role}.`),
     h("p", { class: "muted" }, "Your screen is not built yet."),
