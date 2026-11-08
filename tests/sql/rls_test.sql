@@ -105,6 +105,11 @@ reset role;
 -- organiser ----------------------------------------------------------------
 set local role authenticated;
 select set_config('request.jwt.claim.sub', '00000000-0000-0000-0000-00000000000a', true);
+-- Organiser without MFA (aal1) gets nothing.
+select set_config('request.jwt.claims', '{"aal":"aal1"}', true);
+select t.expect('organiser without MFA sees no athletes', (select count(*) from healthy_athletes.athletes), 0);
+select t.expect('organiser without MFA still sees own staff row', (select count(*) from healthy_athletes.staff), 1);
+select set_config('request.jwt.claims', '{"aal":"aal2"}', true);
 select t.expect('organiser sees all athletes', (select count(*) from healthy_athletes.athletes), 3);
 select t.expect('organiser sees all visits', (select count(*) from healthy_athletes.station_visits), 3);
 select t.expect('organiser sees all staff', (select count(*) from healthy_athletes.staff), 6);

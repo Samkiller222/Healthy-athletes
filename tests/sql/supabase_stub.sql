@@ -23,6 +23,13 @@ as $$
   select nullif(current_setting('request.jwt.claim.sub', true), '')::uuid
 $$;
 
+-- Supabase exposes the JWT claims (including 'aal', the MFA level) via auth.jwt().
+create or replace function auth.jwt() returns jsonb
+  language sql stable
+as $$
+  select coalesce(nullif(current_setting('request.jwt.claims', true), ''), '{}')::jsonb
+$$;
+
 grant usage on schema auth to anon, authenticated;
 grant usage on schema public to anon, authenticated;
 
