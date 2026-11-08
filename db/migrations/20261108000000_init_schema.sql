@@ -7,11 +7,11 @@
 
 begin;
 
--- Everything lives in its own schema so it can share a Supabase project
--- with other apps without touching their tables or access rules.
--- The schema must be added to the project's exposed API schemas
--- (Project Settings > Data API) for the frontend to reach it.
-create schema healthy_athletes;
+-- Everything lives in its own schema. Runs on Neon: Neon Auth (managed
+-- Better Auth) signs users in, and the Neon Data API exposes this schema
+-- (db_schemas = healthy_athletes) using the `authenticated` and `anonymous`
+-- roles. auth.uid() / auth.jwt() come from Neon's pg_session_jwt extension.
+create schema if not exists healthy_athletes;
 revoke all on schema healthy_athletes from public;
 grant usage on schema healthy_athletes to authenticated;
 
@@ -57,7 +57,8 @@ create table healthy_athletes.athletes (
 
 create table healthy_athletes.staff (
   id           uuid primary key default gen_random_uuid(),
-  auth_user_id uuid not null unique references auth.users (id) on delete cascade,
+  -- Neon Auth user id (neon_auth.user.id). No foreign key: Neon manages that schema.
+  auth_user_id uuid not null unique,
   name         text not null check (char_length(name) between 1 and 80),
   role         text not null
                check (role in ('organiser', 'receptionist', 'station_lead', 'display')),
@@ -123,16 +124,25 @@ create table healthy_athletes.audit_log (
 -- Role helpers (security definer so policies can read staff without recursion)
 -- ---------------------------------------------------------------------------
 
+-- The signed-in user's id. Neon's auth schema is owned by Neon and the API
+-- roles have no access to it, so every use of auth.* goes through a security
+-- definer function owned by the database owner.
+create function healthy_athletes.current_user_id() returns uuid
+  language sql stable security definer set search_path = healthy_athletes, pg_temp
+as $$
+  select auth.uid()
+$$;
+
 create function healthy_athletes.current_staff_id() returns uuid
   language sql stable security definer set search_path = healthy_athletes, pg_temp
 as $$
-  select id from healthy_athletes.staff where auth_user_id = auth.uid() and active
+  select id from healthy_athletes.staff where auth_user_id = healthy_athletes.current_user_id() and active
 $$;
 
 create function healthy_athletes.current_staff_role() returns text
   language sql stable security definer set search_path = healthy_athletes, pg_temp
 as $$
-  select role from healthy_athletes.staff where auth_user_id = auth.uid() and active
+  select role from healthy_athletes.staff where auth_user_id = healthy_athletes.current_user_id() and active
 $$;
 
 create function healthy_athletes.has_role(variadic roles text[]) returns boolean
@@ -223,10 +233,10 @@ alter table healthy_athletes.checkins       enable row level security;
 alter table healthy_athletes.station_visits enable row level security;
 alter table healthy_athletes.audit_log      enable row level security;
 
--- The anon key can read and write nothing: it gets no schema usage and no
+-- Signed-out requests (the anonymous role) can read and write nothing: it gets no schema usage and no
 -- grants. Signed-in users get table privileges, and RLS decides the rows.
-revoke all on all tables in schema healthy_athletes from anon, public;
-revoke all on all functions in schema healthy_athletes from anon, public;
+revoke all on all tables in schema healthy_athletes from anonymous, public;
+revoke all on all functions in schema healthy_athletes from anonymous, public;
 grant select, insert, update, delete on all tables in schema healthy_athletes to authenticated;
 grant usage on all sequences in schema healthy_athletes to authenticated;
 grant execute on all functions in schema healthy_athletes to authenticated;
@@ -244,7 +254,7 @@ create policy organiser_read on healthy_athletes.audit_log     for select to aut
 
 -- Every active staff member can see their own staff row.
 create policy staff_self_read on healthy_athletes.staff
-  for select to authenticated using (auth_user_id = auth.uid());
+  for select to authenticated using (auth_user_id = healthy_athletes.current_user_id());
 
 -- Receptionists: read structure and athletes, manage check-ins and queues.
 create policy reception_read on healthy_athletes.events   for select to authenticated using (healthy_athletes.has_role('receptionist'));
@@ -305,7 +315,7 @@ as
   where v.status = 'called'
     and healthy_athletes.has_role('display', 'organiser', 'receptionist', 'station_lead');
 
-revoke all on healthy_athletes.display_feed from anon;
+revoke all on healthy_athletes.display_feed from anonymous;
 grant select on healthy_athletes.display_feed to authenticated;
 
 commit;

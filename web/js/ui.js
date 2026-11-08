@@ -65,8 +65,8 @@ const NAV = [
 ];
 
 /**
- * Every organiser page starts here: checks the user is an organiser signed in
- * with MFA (otherwise sends them to sign-in), then draws the header.
+ * Every organiser page starts here: checks the user is a signed-in organiser
+ * (otherwise sends them to sign-in), then draws the header.
  */
 export async function organiserPage(current) {
   const back = () => location.replace("../index.html");
@@ -75,8 +75,6 @@ export async function organiserPage(current) {
   try {
     staff = await api.currentStaff();
     if (!staff || staff.role !== "organiser") return back();
-    const mfa = await api.mfaStatus();
-    if (mfa.level !== "aal2") return back();
   } catch {
     return back();
   }

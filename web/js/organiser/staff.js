@@ -40,7 +40,7 @@ async function render() {
       class: s.active ? "danger" : "secondary",
       disabled: s.id === me.id,
       onclick: () => {
-        if (s.active && !confirm(`Deactivate ${s.name}? They are signed out of the data straight away and cannot sign in again.`)) return;
+        if (s.active && !confirm(`Deactivate ${s.name}? They are signed out straight away and cannot sign in again.`)) return;
         busy(toggle, async () => { await api.setStaffActive(s.id, !s.active); await render(); });
       },
     }, s.active ? (s.role === "display" ? "Revoke" : "Deactivate") : "Reactivate");
@@ -67,7 +67,7 @@ async function render() {
     h("h1", {}, "Staff accounts"),
     h("section", { class: "panel" },
       h("h2", {}, "New account"),
-      h("p", { class: "muted" }, "Everyone gets a personal login, except the one shared Display account for the hall TV. A random password is generated; give it to the person directly. Organisers set up an authenticator app the first time they sign in."),
+      h("p", { class: "muted" }, "Everyone gets a personal login, except the one shared Display account for the hall TV. A random password is generated; give it to the person directly. Organiser accounts can also manage logins."),
       form),
     h("section", { class: "panel" },
       h("div", { class: "table-wrap" }, h("table", {},

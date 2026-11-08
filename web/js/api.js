@@ -1,14 +1,21 @@
 // Data-access layer. Every screen talks to the backend only through these
-// functions, so the backend (currently Supabase) can be swapped without
-// touching the pages. Each function throws an Error with a readable message.
+// functions, so the backend can be swapped without touching the pages. Each
+// function throws an Error with a readable message.
+//
+// Backend: Neon. Neon Auth (managed Better Auth) handles sign-in and staff
+// logins; the Neon Data API serves the healthy_athletes schema, with
+// row-level security deciding what each role sees.
 
-import { createClient } from "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/+esm";
-import { SUPABASE_URL, SUPABASE_ANON_KEY, DB_SCHEMA } from "../config.js";
+import { createClient } from "../vendor/neon-js-0.10.2.js";
+import { NEON_AUTH_URL, NEON_DATA_API_URL, DB_SCHEMA } from "../config.js";
 
-export const configured = Boolean(SUPABASE_URL && SUPABASE_ANON_KEY);
+export const configured = Boolean(NEON_AUTH_URL && NEON_DATA_API_URL);
 
 const sb = configured
-  ? createClient(SUPABASE_URL, SUPABASE_ANON_KEY, { db: { schema: DB_SCHEMA } })
+  ? createClient({
+      auth: { url: NEON_AUTH_URL },
+      dataApi: { url: NEON_DATA_API_URL, options: { db: { schema: DB_SCHEMA } } },
+    })
   : null;
 
 function need() {
@@ -17,52 +24,37 @@ function need() {
 }
 
 function check({ data, error }) {
-  if (error) throw new Error(error.message || String(error));
+  if (error) throw new Error(error.message || error.statusText || String(error));
   return data;
 }
 
-// --- Sign-in and MFA -------------------------------------------------------
+// --- Sign-in ---------------------------------------------------------------
+// Neon Auth has no two-step sign-in yet, so organisers use a password only for
+// now (Sam's decision, 2026-11-08). The database is ready to require MFA once
+// Neon supports it (healthy_athletes.organiser_mfa_required()).
 
 export async function signIn(email, password) {
-  check(await need().auth.signInWithPassword({ email, password }));
+  check(await need().auth.signIn.email({ email, password }));
 }
 
 export async function signOut() {
   if (sb) await sb.auth.signOut();
 }
 
+async function sessionUser() {
+  const data = check(await need().auth.getSession());
+  return data?.user ?? null;
+}
+
 /** The signed-in staff member ({ id, name, role, active }) or null. */
 export async function currentStaff() {
-  const { data: { session } } = await need().auth.getSession();
-  if (!session) return null;
+  const user = await sessionUser();
+  if (!user) return null;
   const rows = check(await sb.from("staff")
     .select("id, name, role, active")
-    .eq("auth_user_id", session.user.id)
+    .eq("auth_user_id", user.id)
     .eq("active", true));
   return rows[0] ?? null;
-}
-
-/** "aal1" or "aal2" for the current session, plus whether a TOTP factor exists. */
-export async function mfaStatus() {
-  const aal = check(await need().auth.mfa.getAuthenticatorAssuranceLevel());
-  const factors = check(await sb.auth.mfa.listFactors());
-  const totp = (factors.totp ?? []).find((f) => f.status === "verified") ?? null;
-  return { level: aal.currentLevel, factorId: totp?.id ?? null };
-}
-
-/** Start authenticator-app setup. Returns { factorId, qrSvg, secret }. */
-export async function mfaEnrol() {
-  // Clear any half-finished setup first.
-  const factors = check(await need().auth.mfa.listFactors());
-  for (const f of factors.all ?? []) {
-    if (f.status !== "verified") await sb.auth.mfa.unenroll({ factorId: f.id });
-  }
-  const d = check(await sb.auth.mfa.enroll({ factorType: "totp", friendlyName: "Healthy Athletes" }));
-  return { factorId: d.id, qrSvg: d.totp.qr_code, secret: d.totp.secret };
-}
-
-export async function mfaVerify(factorId, code) {
-  check(await need().auth.mfa.challengeAndVerify({ factorId, code }));
 }
 
 // --- Events ----------------------------------------------------------------
@@ -111,21 +103,59 @@ export async function setLead(eventId, stationId, staffId) {
   }
 }
 
-// --- Staff (logins are managed by the staff-admin server function) ---------
+// --- Staff -----------------------------------------------------------------
+// Logins live in Neon Auth and are managed with its admin API, which only
+// works for users with the Neon Auth "admin" role: every organiser gets that
+// role, nobody else does. The staff table (role, active) lives in our schema.
 
-async function staffAdmin(body) {
-  const { data, error } = await need().functions.invoke("staff-admin", { body });
-  if (error) {
-    let msg = error.message;
-    try { msg = (await error.context.json()).error ?? msg; } catch { /* keep msg */ }
-    throw new Error(msg);
+const authRole = (role) => (role === "organiser" ? "admin" : "user");
+
+/** Staff with their login email: [{ id, name, role, active, email, auth_user_id }]. */
+export async function listStaff() {
+  const staff = check(await need().from("staff")
+    .select("id, auth_user_id, name, role, active, created_at").order("role").order("name"));
+  const emails = new Map();
+  for (let offset = 0; ; offset += 500) {
+    const d = check(await sb.auth.admin.listUsers({ query: { limit: 500, offset } }));
+    for (const u of d.users ?? []) emails.set(u.id, u.email);
+    if (!d.users || d.users.length < 500) break;
   }
-  return data;
+  return staff.map((s) => ({ ...s, email: emails.get(s.auth_user_id) ?? "" }));
 }
-export async function listStaff() { return (await staffAdmin({ action: "list" })).staff; }
-export async function createStaff(s) { return (await staffAdmin({ action: "create", ...s })).staff; }
-export async function setStaffActive(staffId, active) { await staffAdmin({ action: "set_active", staff_id: staffId, active }); }
-export async function setStaffPassword(staffId, password) { await staffAdmin({ action: "set_password", staff_id: staffId, password }); }
+
+/** Create a login and its staff row. { name, email, role, password }. */
+export async function createStaff({ name, email, role, password }) {
+  const d = check(await need().auth.admin.createUser({ email, password, name, role: authRole(role) }));
+  const userId = d.user.id;
+  const { data: row, error } = await sb.from("staff")
+    .insert({ auth_user_id: userId, name, role })
+    .select("id, name, role, active").single();
+  if (error) {
+    await sb.auth.admin.removeUser({ userId }); // don't leave a login without a staff row
+    throw new Error(error.message);
+  }
+  return { ...row, email };
+}
+
+/** Switch a staff account on or off. Off also blocks sign-in and ends their sessions. */
+export async function setStaffActive(staffId, active) {
+  const row = check(await need().from("staff").update({ active }).eq("id", staffId)
+    .select("auth_user_id").single());
+  if (active) {
+    check(await sb.auth.admin.unbanUser({ userId: row.auth_user_id }));
+  } else {
+    check(await sb.auth.admin.banUser({ userId: row.auth_user_id, banReason: "Deactivated by an organiser" }));
+    check(await sb.auth.admin.revokeUserSessions({ userId: row.auth_user_id }));
+  }
+}
+
+/** Give a (non-organiser) staff member a new password; their old sessions end. */
+export async function setStaffPassword(staffId, password) {
+  const row = check(await need().from("staff").select("auth_user_id, role").eq("id", staffId).single());
+  if (row.role === "organiser") throw new Error("Organisers change their own password.");
+  check(await sb.auth.admin.setUserPassword({ userId: row.auth_user_id, newPassword: password }));
+  check(await sb.auth.admin.revokeUserSessions({ userId: row.auth_user_id }));
+}
 
 // --- Athletes --------------------------------------------------------------
 

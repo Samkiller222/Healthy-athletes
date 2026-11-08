@@ -7,13 +7,21 @@ begin;
 
 -- ---------------------------------------------------------------------------
 -- MFA for organisers (HANDOFF section 3)
--- An organiser only gets organiser rights once they have signed in with a
--- second factor (Supabase sets aal = 'aal2' in the JWT). At aal1 they can
--- read their own staff row (to find out they must set up MFA) and nothing else.
+-- Neon Auth has no MFA yet (on its roadmap), so for now Sam decided organisers
+-- sign in with a password only (2026-11-08). The check is built in and
+-- switched off: once Neon Auth puts an assurance level ('aal') in its JWT,
+-- a migration that makes organiser_mfa_required() return true turns it on,
+-- and organisers without a second factor then get no organiser rights.
 -- ---------------------------------------------------------------------------
 
-create function healthy_athletes.current_aal() returns text
+create function healthy_athletes.organiser_mfa_required() returns boolean
   language sql stable
+as $$
+  select false
+$$;
+
+create function healthy_athletes.current_aal() returns text
+  language sql stable security definer set search_path = healthy_athletes, pg_temp
 as $$
   select coalesce(auth.jwt() ->> 'aal', 'aal1')
 $$;
@@ -23,7 +31,9 @@ create or replace function healthy_athletes.has_role(variadic roles text[]) retu
 as $$
   select coalesce(
            s.r = any (roles)
-           and (s.r <> 'organiser' or healthy_athletes.current_aal() = 'aal2'),
+           and (s.r <> 'organiser'
+                or not healthy_athletes.organiser_mfa_required()
+                or healthy_athletes.current_aal() = 'aal2'),
            false)
   from (select healthy_athletes.current_staff_role() as r) s
 $$;
@@ -238,20 +248,22 @@ create trigger audit_stations
   for each row execute function healthy_athletes.write_audit();
 
 -- ---------------------------------------------------------------------------
--- Function privileges: nothing for anon.
+-- Function privileges: nothing for anonymous.
 -- ---------------------------------------------------------------------------
 
-revoke all on function healthy_athletes.current_aal() from public, anon;
-revoke all on function healthy_athletes.is_organiser() from public, anon;
-revoke all on function healthy_athletes.next_athlete_code() from public, anon;
-revoke all on function healthy_athletes.import_athletes(jsonb) from public, anon;
-revoke all on function healthy_athletes.staff_keep_one_organiser() from public, anon, authenticated;
-revoke all on function healthy_athletes.station_leads_check() from public, anon, authenticated;
+revoke all on function healthy_athletes.current_aal() from public, anonymous;
+revoke all on function healthy_athletes.organiser_mfa_required() from public, anonymous;
+grant execute on function healthy_athletes.organiser_mfa_required() to authenticated;
+revoke all on function healthy_athletes.is_organiser() from public, anonymous;
+revoke all on function healthy_athletes.next_athlete_code() from public, anonymous;
+revoke all on function healthy_athletes.import_athletes(jsonb) from public, anonymous;
+revoke all on function healthy_athletes.staff_keep_one_organiser() from public, anonymous, authenticated;
+revoke all on function healthy_athletes.station_leads_check() from public, anonymous, authenticated;
 grant execute on function healthy_athletes.current_aal() to authenticated;
 grant execute on function healthy_athletes.is_organiser() to authenticated;
 grant execute on function healthy_athletes.import_athletes(jsonb) to authenticated;
 -- Used as the athletes.code default, so inserting roles need it.
 grant execute on function healthy_athletes.next_athlete_code() to authenticated;
-revoke all on sequence healthy_athletes.athlete_code_seq from anon, authenticated;
+revoke all on sequence healthy_athletes.athlete_code_seq from anonymous, authenticated;
 
 commit;

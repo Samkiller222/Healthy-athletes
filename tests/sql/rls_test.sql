@@ -48,7 +48,7 @@ insert into healthy_athletes.station_visits (id, event_id, station_id, athlete_i
 
 -- Assertion helpers (in a throwaway schema, dropped by the rollback) -------
 create schema t;
-grant usage on schema t to anon, authenticated;
+grant usage on schema t to anonymous, authenticated;
 
 create function t.expect(label text, actual bigint, expected bigint) returns void
   language plpgsql as $$
@@ -81,7 +81,7 @@ begin
   return n;
 end $$;
 
-grant execute on all functions in schema t to anon, authenticated;
+grant execute on all functions in schema t to anonymous, authenticated;
 
 -- Constraints (as table owner) ---------------------------------------------
 select t.expect_error('status must be an allowed value',
@@ -95,21 +95,33 @@ select t.expect_error('athlete cannot be called at two stations',
 select t.expect_error('athlete code format',
   $q$insert into healthy_athletes.athletes (code, first_name, last_name) values ('anything', 'X', 'Y')$q$);
 
--- anon ---------------------------------------------------------------------
-set local role anon;
-select t.expect_error('anon cannot read athletes', 'select * from healthy_athletes.athletes');
-select t.expect_error('anon cannot read display_feed', 'select * from healthy_athletes.display_feed');
-select t.expect_error('anon cannot read visits', 'select * from healthy_athletes.station_visits');
+-- anonymous ---------------------------------------------------------------------
+set local role anonymous;
+select t.expect_error('anonymous cannot read athletes', 'select * from healthy_athletes.athletes');
+select t.expect_error('anonymous cannot read display_feed', 'select * from healthy_athletes.display_feed');
+select t.expect_error('anonymous cannot read visits', 'select * from healthy_athletes.station_visits');
 reset role;
 
 -- organiser ----------------------------------------------------------------
+-- MFA switched on (it is off until Neon Auth supports it): an organiser
+-- without a second factor (aal1) gets nothing but their own staff row.
+create or replace function healthy_athletes.organiser_mfa_required() returns boolean
+  language sql stable as $$ select true $$;
 set local role authenticated;
 select set_config('request.jwt.claim.sub', '00000000-0000-0000-0000-00000000000a', true);
--- Organiser without MFA (aal1) gets nothing.
 select set_config('request.jwt.claims', '{"aal":"aal1"}', true);
-select t.expect('organiser without MFA sees no athletes', (select count(*) from healthy_athletes.athletes), 0);
-select t.expect('organiser without MFA still sees own staff row', (select count(*) from healthy_athletes.staff), 1);
+select t.expect('MFA on: organiser without MFA sees no athletes', (select count(*) from healthy_athletes.athletes), 0);
+select t.expect('MFA on: organiser without MFA still sees own staff row', (select count(*) from healthy_athletes.staff), 1);
 select set_config('request.jwt.claims', '{"aal":"aal2"}', true);
+select t.expect('MFA on: organiser with MFA sees all athletes', (select count(*) from healthy_athletes.athletes), 3);
+reset role;
+create or replace function healthy_athletes.organiser_mfa_required() returns boolean
+  language sql stable as $$ select false $$;
+
+-- MFA off (current setting): a password sign-in is enough.
+set local role authenticated;
+select set_config('request.jwt.claim.sub', '00000000-0000-0000-0000-00000000000a', true);
+select set_config('request.jwt.claims', '{}', true);
 select t.expect('organiser sees all athletes', (select count(*) from healthy_athletes.athletes), 3);
 select t.expect('organiser sees all visits', (select count(*) from healthy_athletes.station_visits), 3);
 select t.expect('organiser sees all staff', (select count(*) from healthy_athletes.staff), 6);

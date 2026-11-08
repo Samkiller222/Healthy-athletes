@@ -26,7 +26,7 @@ insert into healthy_athletes.stations (id, event_id, name) values
   ('31000000-0000-0000-0000-000000000003', '21000000-0000-0000-0000-000000000002', 'Fit Feet');
 
 create schema t;
-grant usage on schema t to anon, authenticated;
+grant usage on schema t to anonymous, authenticated;
 create function t.expect(label text, actual anyelement, expected anyelement) returns void
   language plpgsql as $$
 begin
@@ -49,7 +49,7 @@ begin
   end;
   raise exception 'FAIL %: statement succeeded but should have been refused', label;
 end $$;
-grant execute on all functions in schema t to anon, authenticated;
+grant execute on all functions in schema t to anonymous, authenticated;
 
 -- Station leads ------------------------------------------------------------
 select t.expect_error('only station-lead accounts can lead a station',
@@ -89,17 +89,26 @@ select t.expect_error('receptionist cannot import',
   $q$select healthy_athletes.import_athletes('[{"first_name":"A","last_name":"B"}]')$q$, 'only organisers');
 reset role;
 
--- Import as organiser without MFA: refused ---------------------------------
+-- MFA gate (switched on just for this check) ------------------------------
+create or replace function healthy_athletes.organiser_mfa_required() returns boolean
+  language sql stable as $$ select true $$;
 set local role authenticated;
 select set_config('request.jwt.claim.sub', '00000000-0000-0000-0000-0000000000a1', true);
 select set_config('request.jwt.claims', '{"aal":"aal1"}', true);
-select t.expect_error('organiser without MFA cannot import',
+select t.expect_error('MFA on: organiser without MFA cannot import',
   $q$select healthy_athletes.import_athletes('[{"first_name":"A","last_name":"B"}]')$q$, 'only organisers');
-select t.expect('organiser without MFA is not an organiser yet', healthy_athletes.is_organiser(), false);
-
--- Import as organiser with MFA ---------------------------------------------
+select t.expect('MFA on: organiser without MFA is not an organiser yet', healthy_athletes.is_organiser(), false);
 select set_config('request.jwt.claims', '{"aal":"aal2"}', true);
-select t.expect('organiser with MFA is an organiser', healthy_athletes.is_organiser(), true);
+select t.expect('MFA on: organiser with MFA is an organiser', healthy_athletes.is_organiser(), true);
+reset role;
+create or replace function healthy_athletes.organiser_mfa_required() returns boolean
+  language sql stable as $$ select false $$;
+
+-- Import as organiser (MFA off, the current setting) ----------------------
+set local role authenticated;
+select set_config('request.jwt.claim.sub', '00000000-0000-0000-0000-0000000000a1', true);
+select set_config('request.jwt.claims', '{}', true);
+select t.expect('MFA off: password sign-in is enough', healthy_athletes.is_organiser(), true);
 
 select t.expect_error('unknown columns are rejected',
   $q$select healthy_athletes.import_athletes('[{"first_name":"A","last_name":"B","medical_notes":"x"}]')$q$, 'unknown column\(s\): medical_notes');
@@ -147,9 +156,9 @@ select t.expect('imports are audited',
      and staff_id = '11000000-0000-0000-0000-0000000000a1'), 5::bigint);
 reset role;
 
--- anon cannot call the import at all ---------------------------------------
-set local role anon;
-select t.expect_error('anon cannot import',
+-- anonymous cannot call the import at all ---------------------------------------
+set local role anonymous;
+select t.expect_error('anonymous cannot import',
   $q$select healthy_athletes.import_athletes('[]')$q$, 'permission denied');
 reset role;
 

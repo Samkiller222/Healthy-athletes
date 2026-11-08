@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Apply the Supabase stub + all migrations to a scratch Postgres database,
+# Apply the Neon stub + all migrations to a scratch Postgres database,
 # then run the schema guard and RLS tests.
 # Needs psql and a superuser connection via the usual PG* env vars.
 set -euo pipefail
@@ -10,8 +10,8 @@ psql -v ON_ERROR_STOP=1 -q -d postgres -c "drop database if exists $DB" -c "crea
 
 run() { psql -v ON_ERROR_STOP=1 -q -X -o /dev/null -d "$DB" -f "$1"; }
 
-run tests/sql/supabase_stub.sql
-for f in supabase/migrations/*.sql; do
+run tests/sql/neon_stub.sql
+for f in db/migrations/*.sql; do
   echo "applying $f"
   run "$f"
 done
