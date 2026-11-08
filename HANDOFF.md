@@ -157,7 +157,7 @@ No health data does **not** mean no personal data. Names of people with intellec
 - [ ] HTTPS only; no personal data in URLs, logs or analytics.
 - [ ] Display shows **first name + code only**, never surnames or clubs.
 - [ ] Audit log of check-ins, status changes, exports and deletions.
-- [ ] **Retention:** event-day records deleted or anonymised *N* days after the event (decide N with SO Malta); aggregates kept.
+- [ ] **Retention:** event-day records deleted manually by an Organiser after each event (see Q2); aggregates kept.
 - [ ] Breach contact and procedure written down (IDPC must be notified within 72 hours).
 - [ ] **This repo is public.** Never commit real names, CSV imports, `.env` files or keys. Seed data must be fake. Consider making the repo private.
 
@@ -170,19 +170,19 @@ No health data does **not** mean no personal data. Names of people with intellec
 3. **Station call-up + Display** — the core event-day loop.
 4. **Reception check-in + wristband codes.**
 5. **Passport view + dashboard.**
-6. Retention job, exports, accessibility pass (large text, high contrast, simple language, station colours/icons).
+6. Exports, accessibility pass (retention stays manual for now, see Q2) (large text, high contrast, simple language, station colours/icons).
 7. Dry run at a small session before a full Healthy Athletes event.
 
 ---
 
-## 9. Open questions for Sam
+## 9. Open questions (answered by Sam, 2026-11-08)
 
-- **Q1.** Support needs: is a neutral logistics field like "comes with a support person (name)" acceptable, or should all of that stay verbal/paper? Default here: **excluded**.
-- **Q2.** Retention period after each event?
-- **Q3.** Does SO Malta (or Special Olympics International's Healthy Athletes programme) already require a particular system or data format for event logistics?
-- **Q4.** Which stations run at the first event, and roughly how many athletes?
-- **Q5.** Languages for the Display and station screens (Maltese, English, others)?
-- **Q6.** One Display screen for the whole hall, or one per area? (The design supports either; a per-area display would just filter `display_feed` by station.)
+- **Q1. Support needs** — **Excluded.** Every athlete comes with their parents, so no support-person field is needed.
+- **Q2. Retention** — **Manual deletion for now.** Organisers delete event data by hand; no automatic retention job yet. (Athlete names are still personal data under GDPR, so deletion after each event should still happen.)
+- **Q3. Required system or data format** — **None.**
+- **Q4. Stations and athlete numbers for the first event** — **Still open.**
+- **Q5. Languages** — **English only.**
+- **Q6. Displays** — **One Display account for the whole hall for now.** Revisit with the client; per-area displays would just filter `display_feed` by station.
 
 ---
 
