@@ -100,12 +100,14 @@ select t.expect('next is the earliest queued', (select j #>> '{stations,0,next,f
 select t.expect('wait uses measured average (2 x 4 min)', (select j #>> '{stations,0,wait_minutes}' from b), '8');
 select t.expect('wait falls back to minutes per athlete (1 x 10)', (select j #>> '{stations,1,wait_minutes}' from b), '10');
 
--- Never surname, club or anything beyond first name + code.
-select t.expect('no surname anywhere in the board',
-  (select (j::text ~ 'Surname')::text from b), 'false');
-select t.expect('only first name and code per athlete',
+-- Full name + code (Sam's decision), never club or anything else.
+select t.expect('call shows surname', (select j #>> '{calls,0,last_name}' from b), 'Surnameone');
+select t.expect('only name and code per athlete',
   (select string_agg(k, ',' order by k) from b, jsonb_object_keys(j #> '{stations,0,next}') k),
-  'athlete_code,first_name');
+  'athlete_code,first_name,last_name');
+select t.expect('only name, code, station and time per call',
+  (select string_agg(k, ',' order by k) from b, jsonb_object_keys(j #> '{calls,0}') k),
+  'athlete_code,called_at,first_name,last_name,station_id');
 
 -- Still no direct table access for the display account.
 select t.expect('display still reads no athletes rows',

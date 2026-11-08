@@ -4,7 +4,8 @@
 // seconds (one small request). Neon's realtime feed would need a server of
 // our own, and for a single TV polling is simpler and just as quick to the eye.
 //
-// Privacy: athletes appear by first name + athlete code only (HANDOFF §2, §3).
+// Privacy: athletes appear by full name + athlete code, never club or anything
+// else (Sam's decision 2026-11-08, see HANDOFF §2).
 // All text goes in via textContent, never innerHTML.
 //
 // URL options:
@@ -98,8 +99,8 @@ function dot(st) {
   return d;
 }
 
-function nameWithCode(person) {
-  return [person.first_name, h("span", { class: "code" }, person.athlete_code)];
+function fullName(person) {
+  return [person.first_name, person.last_name].filter(Boolean).join(" ");
 }
 
 function render(board) {
@@ -119,8 +120,8 @@ function render(board) {
         return h("li", { class: `call${i === 0 ? " first" : ""}${fresh.includes(keys[i]) ? " new" : ""}` },
           dot(st),
           h("div", { class: "who" },
-            h("div", { class: "name" }, nameWithCode(c)),
-            h("div", { class: "where" }, st ? `Go to ${st.name}` : "")));
+            h("div", { class: "name" }, fullName(c)),
+            h("div", { class: "where" }, h("span", { class: "code" }, c.athlete_code), st ? ` · Go to ${st.name}` : "")));
       })
     : [h("li", { class: "empty" }, board.event ? "Nobody is being called right now." : "")]));
   if (fresh.length) chime();
@@ -136,7 +137,8 @@ function render(board) {
           s.subtitle ? h("div", { class: "sub" }, s.subtitle) : null),
         h("div", { class: "stat next" },
           h("div", { class: "label" }, "Next"),
-          h("div", { class: "value" }, s.next ? nameWithCode(s.next) : h("span", { class: "none" }, "—"))),
+          h("div", { class: "value" }, s.next ? fullName(s.next) : h("span", { class: "none" }, "—")),
+          s.next ? h("div", { class: "code" }, s.next.athlete_code) : null),
         h("div", { class: "stat queue" },
           h("div", { class: "label" }, "In queue"),
           h("div", { class: "value" }, String(s.queued))),

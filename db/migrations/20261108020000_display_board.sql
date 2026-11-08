@@ -3,8 +3,9 @@
 -- Stations get an icon, a short subtitle and a typical minutes-per-athlete
 -- so the hall display can show each station's icon, who is next, how many
 -- are queued and an estimated wait. display_board() returns everything the
--- TV needs in one call, with first name + athlete code only: never surname,
--- club or anything else about the athlete.
+-- TV needs in one call. Athletes appear by full name + athlete code (Sam's
+-- decision, 2026-11-08, matching the hall layout he chose); never club or
+-- anything else about the athlete.
 --
 -- LOGISTICS ONLY. No health data. See HANDOFF.md section 2.
 
@@ -31,16 +32,16 @@ alter table healthy_athletes.stations
 -- One JSON document for the TV:
 --   event     { id, name }
 --   calls     athletes currently called, newest first (max 6):
---             { first_name, athlete_code, station_id, called_at }
+--             { first_name, last_name, athlete_code, station_id, called_at }
 --   stations  every active station in display order:
 --             { id, name, subtitle, icon, colour, queued, wait_minutes,
---               next: { first_name, athlete_code } | null }
+--               next: { first_name, last_name, athlete_code } | null }
 --   now       server time, so the TV clock can't drift far
 --
 -- With no event id it picks today's live event (or the latest live one).
 -- Readable by every active staff role, including Display. Security definer
 -- because Display has no table access at all: this function is its only
--- window, and it only ever hands out first name + code.
+-- window, and it only ever hands out name + code.
 --
 -- Estimated wait = people queued x average minutes per athlete, where the
 -- average is taken from the station's last 10 finished visits at this event
@@ -79,11 +80,12 @@ begin
     'calls', coalesce((
       select jsonb_agg(jsonb_build_object(
                'first_name', c.first_name,
+               'last_name', c.last_name,
                'athlete_code', c.code,
                'station_id', c.station_id,
                'called_at', c.called_at) order by c.called_at desc)
       from (
-        select a.first_name, a.code, v.station_id, v.called_at
+        select a.first_name, a.last_name, a.code, v.station_id, v.called_at
         from healthy_athletes.station_visits v
         join healthy_athletes.athletes a on a.id = v.athlete_id
         join healthy_athletes.stations st on st.id = v.station_id
@@ -120,7 +122,7 @@ begin
         ) d
       ) avg_min
       left join lateral (
-        select jsonb_build_object('first_name', a.first_name, 'athlete_code', a.code) as next
+        select jsonb_build_object('first_name', a.first_name, 'last_name', a.last_name, 'athlete_code', a.code) as next
         from healthy_athletes.station_visits v
         join healthy_athletes.athletes a on a.id = v.athlete_id
         where v.station_id = st.id and v.event_id = ev.id and v.status = 'queued'

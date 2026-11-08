@@ -1,5 +1,5 @@
 // Made-up board for checking the display layout (display/index.html?demo).
-// Fake first names and codes only; nothing here comes from the database.
+// Made-up names and codes only; nothing here comes from the database.
 
 const STATIONS = [
   ["Fit Feet", "Feet and footwear", "foot", "#198754"],
@@ -11,6 +11,7 @@ const STATIONS = [
   ["Strong Minds", "Emotional wellbeing", "mind", "#0b7f99"],
 ];
 const NAMES = ["Alex", "Bea", "Carmen", "Dylan", "Ella", "Finn", "Gabi", "Hugo", "Isla", "Jake", "Kira", "Luca", "Maya", "Noah"];
+const SURNAMES = ["Sample", "Example", "Demo", "Testa", "Placeholder", "Mockford", "Fictus"];
 
 let step = 0;
 
@@ -23,13 +24,14 @@ export function demoBoard() {
     return {
       id: `s${i}`, name, subtitle, icon, colour, queued,
       wait_minutes: queued ? queued * (6 + i) : null,
-      next: queued ? { first_name: NAMES[(i * 3 + turn) % NAMES.length], athlete_code: `HA-${String(100 + i * 11 + turn).padStart(4, "0")}` } : null,
+      next: queued ? { first_name: NAMES[(i * 3 + turn) % NAMES.length], last_name: SURNAMES[(i + turn) % SURNAMES.length], athlete_code: `HA-${String(100 + i * 11 + turn).padStart(4, "0")}` } : null,
     };
   });
   const calls = [0, 1, 2, 3, 4].map((k) => {
     const n = turn - k;
     return {
       first_name: NAMES[((n % NAMES.length) + NAMES.length) % NAMES.length],
+      last_name: SURNAMES[((n % SURNAMES.length) + SURNAMES.length) % SURNAMES.length],
       athlete_code: `HA-${String(200 + n).padStart(4, "0")}`,
       station_id: `s${((n % STATIONS.length) + STATIONS.length) % STATIONS.length}`,
       called_at: new Date(1.8e12 + n * 12000).toISOString(),

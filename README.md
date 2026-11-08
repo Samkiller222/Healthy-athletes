@@ -4,7 +4,7 @@ Event-day logistics for Special Olympics Malta Healthy Athletes: reception check
 
 ## Database
 
-`db/migrations/` holds the Postgres schema (all in its own `healthy_athletes` schema), runs on Neon (Frankfurt), and holds the, check constraints and row-level security for the four roles (organiser, receptionist, station lead, display). The Display account has no table access: it reads only the `display_feed` view and the `display_board()` function, which give first name + athlete code, never surname or club.
+`db/migrations/` holds the Postgres schema (all in its own `healthy_athletes` schema), runs on Neon (Frankfurt), and holds the, check constraints and row-level security for the four roles (organiser, receptionist, station lead, display). The Display account has no table access: it reads only the `display_feed` view (first name + code) and the `display_board()` function used by the TV (full name + code), never club.
 
 ## Tests
 
@@ -40,7 +40,7 @@ Run locally: `python3 -m http.server -d web 8000` (Neon Auth allows localhost). 
 
 - Left, **Calling now**: everyone currently called, newest first and largest, with the station's icon and colour.
 - Right, one row per active station: icon, name and TV subtitle, who is **next**, how many are **in queue**, and an estimated **wait** (queue length x the station's average minutes per athlete over its last 10 finished visits, or the organiser's "minutes per athlete" until there are any).
-- Athletes appear by **first name + athlete code only**, never surname or club.
+- Athletes appear by **full name + athlete code**, never club or anything else (Sam's decision, 2026-11-08).
 - Data comes from one database function, `display_board()`, polled every 3 seconds. It shows the event marked **Live** (or `?event=<id>`). A yellow "Reconnecting" banner appears if the connection drops; the clock follows the server's time (Malta time).
 - A soft chime plays on each new call once someone clicks **Turn on call chime** (browsers block sound until a click). In kiosk mode start Chrome with `--kiosk --autoplay-policy=no-user-gesture-required` and no click is needed.
 - `display/index.html?demo` shows made-up data with no sign-in, to check the layout on the TV.
