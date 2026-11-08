@@ -32,3 +32,8 @@ jobs:
       - uses: actions/checkout@v4
       - name: Schema guard and RLS tests
         run: ./tests/run.sh
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: CSV import tests
+        run: node --test 'tests/web/*.test.mjs'
