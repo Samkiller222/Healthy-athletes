@@ -87,3 +87,10 @@ ul.errors { margin: 8px 0 0; padding-left: 20px; color: var(--err-text); }
   th.hide-sm, td.hide-sm { display: none; }
 }
 .nowrap { white-space: nowrap; }
+.icon-preview { display: inline-grid; place-items: center; width: 32px; height: 32px; border-radius: 50%; color: #fff; flex: none; }
+.icon-preview svg { width: 20px; height: 20px; }
+td input + input, td select + input { margin-top: 6px; }
+input.num { width: 5.5em; }
+td .row.nowrap { flex-wrap: nowrap; }
+td .row.nowrap select { flex: 1; }
+td div + input { margin-top: 6px; }

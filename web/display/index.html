@@ -1,0 +1,28 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="referrer" content="no-referrer">
+  <title>Call-up display · Healthy Athletes</title>
+  <link rel="stylesheet" href="../css/display.css">
+</head>
+<body>
+  <div id="banner" class="banner" role="status" hidden></div>
+  <header class="bar">
+    <h1 id="event-name">Healthy Athletes</h1>
+    <time id="clock" aria-label="Current time"></time>
+  </header>
+  <main class="board">
+    <section class="calling" aria-labelledby="calling-title">
+      <h2 id="calling-title">Calling now</h2>
+      <ol id="calls" class="calls" aria-live="polite"></ol>
+    </section>
+    <section class="stations" aria-label="Stations">
+      <ul id="stations" class="station-list"></ul>
+    </section>
+  </main>
+  <button id="chime" class="chime" type="button" hidden>Turn on call chime</button>
+  <script type="module" src="../js/display.js"></script>
+</body>
+</html>
